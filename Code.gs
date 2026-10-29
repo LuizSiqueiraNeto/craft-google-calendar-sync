@@ -1,5 +1,5 @@
 /**
- * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V42 BETA)
+ * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V43 BETA)
  * Public example: configure your Craft connection in Script Properties.
  * Released under the MIT License. See LICENSE for the full disclaimer.
  */
@@ -347,7 +347,10 @@ function syncCraftWithGoogleCalendarCore_() {
           Math.abs(startTime.getTime() - new Date(lastSyncISO).getTime()) > 60000;
         const lastReminderMatch = desc.match(/\[LAST_SYNC_REMINDER_AT:([^\]]+)\]/);
         const lastReminderAt = lastReminderMatch ? new Date(lastReminderMatch[1]) : null;
-        const reminderDiffersFromEvent = !recurring &&
+        // A completed task may lose its Craft reminder. Do not recreate it,
+        // and do not send a past time that Craft rejects.
+        const reminderDiffersFromEvent = !recurring && taskState === 'todo' &&
+          evStart.getTime() > Date.now() + 60000 &&
           (!reminderStart || !isFinite(reminderStart.getTime()) ||
            Math.abs(reminderStart.getTime() - evStart.getTime()) > 60000);
         const craftReminderChanged = lastReminderAt && reminderStart &&
@@ -450,7 +453,10 @@ function syncCraftWithGoogleCalendarCore_() {
         }
 
         if (craftWins) {
-          if (!recurring && rem && rem.id && reminderStart && startTime &&
+          let reminderSavedAt = null;
+          if (!recurring && taskState === 'todo' && rem && rem.id &&
+              reminderStart && startTime &&
+              startTime.getTime() > Date.now() + 60000 &&
               Math.abs(reminderStart.getTime() - startTime.getTime()) > 60000) {
             if (!remindersAvailable) {
               throw new Error('Craft reminder could not be moved: reminders endpoint unavailable.');
@@ -460,6 +466,7 @@ function syncCraftWithGoogleCalendarCore_() {
                 remindAt: startTime.toISOString() }]
             }), rem.id);
             verifyReminderTime(blockId, rem.id, startTime);
+            reminderSavedAt = startTime.toISOString();
           }
           if (durationTagMissing || (gcalResizedByUser && parsed.durationMin !== syncedDur)) {
             assertItem(craftRequest('PUT', '/tasks', {
@@ -474,7 +481,9 @@ function syncCraftWithGoogleCalendarCore_() {
           desc = upsertMarker(desc, 'LAST_SYNC_START', startTime.toISOString());
           desc = upsertMarker(desc, 'LAST_SYNC_DUR', syncedDur);
           if (recurring) desc = upsertMarker(desc, 'LAST_SYNC_REPEAT_OFFSET', craftOffset);
-          else desc = upsertMarker(desc, 'LAST_SYNC_REMINDER_AT', startTime.toISOString());
+          else if (reminderSavedAt) {
+            desc = upsertMarker(desc, 'LAST_SYNC_REMINDER_AT', reminderSavedAt);
+          }
           existingEv.setDescription(desc);
         } else if (gcalMovedByUser || gcalResizedByUser || recurringTimeMismatch ||
                    reminderDiffersFromEvent) {
@@ -509,7 +518,9 @@ function syncCraftWithGoogleCalendarCore_() {
             if (payload.markdown) durationTagWritten = true;
           }
 
-          if (!recurring && (gcalMovedByUser || reminderDiffersFromEvent)) {
+          if (!recurring && taskState === 'todo' &&
+              evStart.getTime() > Date.now() + 60000 &&
+              (gcalMovedByUser || reminderDiffersFromEvent)) {
             if (!remindersAvailable) {
               throw new Error('Time was not sent: reminders endpoint unavailable.');
             }
