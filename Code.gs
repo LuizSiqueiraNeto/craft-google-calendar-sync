@@ -1,5 +1,5 @@
 /**
- * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V41 BETA)
+ * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V42 BETA)
  * Public example: configure your Craft connection in Script Properties.
  * Released under the MIT License. See LICENSE for the full disclaimer.
  */
@@ -175,7 +175,7 @@ function syncCraftWithGoogleCalendarCore_() {
     const blockId = task.id;
     const rem = reminderMap[blockId];
     
-    const startTime = extractTaskStartTime(task, rem, timeZone);
+    let startTime = extractTaskStartTime(task, rem, timeZone);
     const schedDateStr = task.taskInfo && task.taskInfo.scheduleDate;
 
     if (!schedDateStr) return;
@@ -308,6 +308,23 @@ function syncCraftWithGoogleCalendarCore_() {
 
         const lastSyncMatch = desc.match(/\[LAST_SYNC_START:([^\]]+)\]/);
         const lastSyncISO = lastSyncMatch ? lastSyncMatch[1] : evStart.toISOString();
+        const recurring = !!task.repeat;
+        const reminderStart = rem && rem.remindAt
+          ? new Date(rem.remindAt) : null;
+        // Moving a one-off task's scheduled date in Craft can leave its timed
+        // reminder on the previous date. Reuse its local clock time on the new
+        // task date; the reminder itself is updated below before moving the event.
+        if (!recurring && lastSyncMatch && reminderStart &&
+            isFinite(reminderStart.getTime())) {
+          const previousDate = Utilities.formatDate(new Date(lastSyncISO),
+            timeZone, 'yyyy-MM-dd');
+          const reminderDate = Utilities.formatDate(reminderStart,
+            timeZone, 'yyyy-MM-dd');
+          if (schedDateStr !== previousDate && reminderDate === previousDate) {
+            startTime = combineTaskDateAndClock_(schedDateStr,
+              reminderStart, timeZone);
+          }
+        }
         
         const lastDurMatch = desc.match(/\[LAST_SYNC_DUR:(\d+)\]/);
         const lastSyncDur = lastDurMatch ? parseInt(lastDurMatch[1], 10) : parsed.durationMin;
@@ -328,9 +345,6 @@ function syncCraftWithGoogleCalendarCore_() {
         // the repeat clock time, so compare the full start time.
         const craftStartChanged = startTime &&
           Math.abs(startTime.getTime() - new Date(lastSyncISO).getTime()) > 60000;
-        const recurring = !!task.repeat;
-        const reminderStart = rem && rem.remindAt
-          ? new Date(rem.remindAt) : null;
         const lastReminderMatch = desc.match(/\[LAST_SYNC_REMINDER_AT:([^\]]+)\]/);
         const lastReminderAt = lastReminderMatch ? new Date(lastReminderMatch[1]) : null;
         const reminderDiffersFromEvent = !recurring &&
@@ -436,6 +450,17 @@ function syncCraftWithGoogleCalendarCore_() {
         }
 
         if (craftWins) {
+          if (!recurring && rem && rem.id && reminderStart && startTime &&
+              Math.abs(reminderStart.getTime() - startTime.getTime()) > 60000) {
+            if (!remindersAvailable) {
+              throw new Error('Craft reminder could not be moved: reminders endpoint unavailable.');
+            }
+            assertItem(craftRequest('PUT', '/reminders', {
+              remindersToUpdate: [{ id: rem.id,
+                remindAt: startTime.toISOString() }]
+            }), rem.id);
+            verifyReminderTime(blockId, rem.id, startTime);
+          }
           if (durationTagMissing || (gcalResizedByUser && parsed.durationMin !== syncedDur)) {
             assertItem(craftRequest('PUT', '/tasks', {
               tasksToUpdate: [{ id: blockId,
@@ -861,6 +886,11 @@ function extractTaskStartTime(task, reminderObj, timeZone) {
 
   const clock = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
   return Utilities.parseDate(schedDate + ' ' + clock, timeZone, 'yyyy-MM-dd HH:mm');
+}
+
+function combineTaskDateAndClock_(date, sourceTime, timeZone) {
+  const clock = Utilities.formatDate(sourceTime, timeZone, 'HH:mm');
+  return Utilities.parseDate(date + ' ' + clock, timeZone, 'yyyy-MM-dd HH:mm');
 }
 
 function assertItem(response, id) {
