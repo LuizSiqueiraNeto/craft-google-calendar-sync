@@ -1,6 +1,6 @@
 # Craft ↔ Google Calendar with Apps Script
 
-A personal bridge between Craft tasks and a dedicated Google Calendar. The complete script is in [Code.gs](Code.gs). This public beta version of V44 requires your own configuration and contains no author's Craft connection URL or remote token.
+A personal bridge between Craft tasks and a dedicated Google Calendar. The complete script is in [Code.gs](Code.gs). This public beta version of V45 requires your own configuration and contains no author's Craft connection URL or remote token.
 
 > **Beta software:** Start with a test Craft space and calendar. Synchronization can edit tasks and reminders, create or move events, and delete events linked to tasks removed from Craft. Back up important data before using it with your main space and calendar.
 
@@ -33,7 +33,7 @@ The script searches 14 days back and 14 days ahead (`SYNC_DAYS_AHEAD`). Events o
 - Moving an all-day event changes the task date after an initial run records `LAST_SYNC_DATE`.
 - Completing or canceling a recurring occurrence can preserve its old event as history and create the next one. Completing it in Craft is the more predictable approach.
 - A completed one-off task can remain as a historical Calendar event without a Craft reminder. The script does not recreate a reminder for a completed task or a time that has already passed.
-- Craft callout wrappers around task text are omitted from Calendar event titles. Existing linked events receive the cleaned title on the next sync.
+- XML-like presentation tags around or inside Craft task text are omitted from Calendar event titles, while their text content remains. Existing linked events receive the cleaned title on the next sync.
 - When both sides change before a run, conflict resolution depends on the field. Avoid editing the same item simultaneously.
 - Deleting a Craft task can remove its linked pending event. Deleting only the calendar event may cause the script to recreate it while the Craft task exists.
 
@@ -94,7 +94,7 @@ The Calendar trigger uses saved code, while the `/exec` URL uses a published ver
 4. Move the one-off task to another future day in Craft while keeping its time. Run the sync and check that the same Calendar event and the Craft reminder both moved to that day. Run it again to confirm there is no duplicate.
 5. Change the Craft tag to `#min30`, run the sync, and check the calendar event duration.
 6. After installing the calendar trigger, move the test event once more and inspect **Executions** in Apps Script. The trigger may take some time to run; confirm the final state in Craft.
-7. For all-day events created by earlier versions, run V44 once to record their reference date before testing a calendar move.
+7. For all-day events created by earlier versions, run V45 once to record their reference date before testing a calendar move.
 
 ## Before making the repository public
 
