@@ -1,5 +1,5 @@
 /**
- * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V43 BETA)
+ * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V44 BETA)
  * Public example: configure your Craft connection in Script Properties.
  * Released under the MIT License. See LICENSE for the full disclaimer.
  */
@@ -823,6 +823,9 @@ function repairCraftLink_(description, link) {
 function parseTaskWithTags(md) {
   let text = md;
 
+  // Craft can wrap a task block in callout markup. It is presentation only;
+  // remove the wrapper before parsing the task marker and duration tag.
+  text = text.replace(/<\/?callout\b[^>]*>/gi, '');
   text = text.replace(/\([^\)]*\)/g, '');
   text = text.replace(/\*\*[^*]+\*\*/g, '');
   text = text.replace(/~/g, '');
