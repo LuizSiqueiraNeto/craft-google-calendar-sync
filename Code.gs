@@ -1,5 +1,5 @@
 /**
- * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V44 BETA)
+ * TWO-WAY SYNC: CRAFT ⇄ GOOGLE CALENDAR (V45 BETA)
  * Public example: configure your Craft connection in Script Properties.
  * Released under the MIT License. See LICENSE for the full disclaimer.
  */
@@ -823,9 +823,9 @@ function repairCraftLink_(description, link) {
 function parseTaskWithTags(md) {
   let text = md;
 
-  // Craft can wrap a task block in callout markup. It is presentation only;
-  // remove the wrapper before parsing the task marker and duration tag.
-  text = text.replace(/<\/?callout\b[^>]*>/gi, '');
+  // Craft may wrap task text in XML-like presentation tags. Keep the text
+  // inside them, then parse the task marker and duration tag as usual.
+  text = stripXmlMarkupForTitle_(text);
   text = text.replace(/\([^\)]*\)/g, '');
   text = text.replace(/\*\*[^*]+\*\*/g, '');
   text = text.replace(/~/g, '');
@@ -851,6 +851,15 @@ function parseTaskWithTags(md) {
     cleanTitle: text || 'Craft task',
     durationMin: durationMin
   };
+}
+
+function stripXmlMarkupForTitle_(text) {
+  return text
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\?[\s\S]*?\?>/g, '')
+    .replace(/<![^<>]*>/g, '')
+    .replace(/<\/?[A-Za-z_][A-Za-z0-9_.:-]*(?:\s+(?:"[^"]*"|'[^']*'|[^'"<>])*)?\s*\/?>/g, '');
 }
 
 function snapToAllowedDuration(mins) {
